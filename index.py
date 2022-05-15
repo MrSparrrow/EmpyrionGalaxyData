@@ -8,11 +8,27 @@ galaxy = {
 		"planets": {
 			1: {
 				"name": "Omicron",
-				"type": "Desert"
+				"type": "Desert",
+				"moons": {
+					1: {
+						"name": "Omicron moon"
+					},
+					2: {
+						"name": "Omicron moon 1"
+					}
+				}
 			},
 			2: {
 				"name": "Roggery",
-				"type": "Swamp"
+				"type": "Swamp",
+				"moons": {
+					1: {
+						"name": "Roggery moon"
+					},
+					2: {
+						"name": "Roggery moon 1"
+					}
+				}
 			}
 		}
 	},
@@ -39,3 +55,12 @@ def home():
 @app.get("/system-by-id/{system_id}")
 def get_system(system_id: int = Path(1, description="ID of planetary system you want", ge=1)):
 	return galaxy[system_id]
+
+@app.get("/planet-by-name/{planet_name}")
+def get_planet(planet_name: str = Path("Omicron", description="Listed name of planet")):
+	for sector_id in galaxy:
+		sector = galaxy[sector_id]
+		for planet_id in sector.get("planets"):
+			planet = sector.get("planets")[planet_id]
+			if planet.get("name") == planet_name:
+				return planet
