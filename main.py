@@ -16,7 +16,12 @@ galaxy = {
 					2: {
 						"name": "Omicron moon 1"
 					}
-				}
+				},
+				"resources": [
+					"iron",
+					"copper",
+					"silicon"
+				]
 			},
 			2: {
 				"name": "Roggery",
