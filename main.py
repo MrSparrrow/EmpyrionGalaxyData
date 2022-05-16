@@ -67,5 +67,5 @@ def get_planet(planet_name: str = Path("Omicron", description="Listed name of pl
 		sector = galaxy[sector_id]
 		for planet_id in sector.get("planets"):
 			planet = sector.get("planets")[planet_id]
-			if planet.get("name") == planet_name:
+			if planet.get("name").lower() == planet_name.lower():
 				return planet
