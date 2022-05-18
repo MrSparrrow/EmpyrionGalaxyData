@@ -74,35 +74,52 @@ def get_planet_name(planet_name: str = Path("Omicron", description="Listed name 
 
 @app.get("/all-galaxy-info")
 def get_galaxy_info():
-    data = {}
     pool = createConnPool()
     with pool.connect() as db_conn:
-        systems = db_conn.execute("SELECT * FROM Systems").fetchall()
-        for system in systems:
+        systems = {}
+        i = 0
+        db_data = db_conn.execute("SELECT * FROM Systems").fetchall()
+        for system in db_data:
+            d = {}
             system_id = int(system["system_id"])
-            planets = db_conn.execute(get_planet_by_system, id=system_id).fetchall()
-            for planet in planets:
-                planet_id = int(planet["planet_id"])  
-                resources = db_conn.execute(get_resource_by_planet, id=planet_id).fetchall()
-                return get_resource_info(info_in=resources)
+            d["system_id"] = system_id
+            d["system_name"] = system["system_name"]
+            d["system_class"] = system["system_class"]
+            d["planets"] = get_planet_info(system_id)
+            systems[i] = d
+            i += 1
+        return systems
 
-def get_planet_info(info_in: str):
-    planet = {}
-    planet["system_id"] = info_in["system_id"]
-    planet["planet_id"] = info_in["planet_id"]
-    planet["planet_name"] = info_in["planet_name"]
-    planet["planet_type"] = info_in["planet_type"]
-    planet["isStarter"] = info_in["isStarter"]
-    return planet
+def get_planet_info(system_id: str):
+    pool = createConnPool()
+    with pool.connect() as db_conn:
+        planets = {}
+        i = 0
+        db_data = db_conn.execute(get_planet_by_system, id=system_id).fetchall()
+        for planet in db_data:
+            d = {}
+            planet_id = int(planet["planet_id"])
+            d["planet_id"] = planet_id
+            d["planet_name"] = planet["planet_name"]
+            d["planet_type"] = planet["planet_type"]
+            d["isStarter"] = planet["isStarter"]
+            d["resources"] = get_resource_info(planet_id)
+            planets[i] = d
+            i += 1
+        return planets
 
-def get_resource_info(info_in: str):
-    resources = {}
-    i = 0
-    for resource in info_in:
-        d = {}
-        d["resource_id"] = resource["resource_id"]
-        d["resource_name"] = resource["resource_name"]
-        d["resource_quantity"] = resource["resource_quantity"]
-        resources[i] = d
-        i += 1
-    return resources
+def get_resource_info(planet_id: int):
+    pool = createConnPool()
+    with pool.connect() as db_conn:
+        resources = {}
+        i = 0
+        db_data = db_conn.execute(get_resource_by_planet, id=planet_id).fetchall()
+        for resource in db_data:
+            d = {}
+            resource_id = int(resource["resource_id"])
+            d["resource_id"] = resource_id
+            d["resource_name"] = resource["resource_name"]
+            d["resource_quantity"] = resource["resource_quantity"]
+            resources[i] = d
+            i += 1
+        return resources
