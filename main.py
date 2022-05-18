@@ -6,13 +6,19 @@ app = FastAPI()
 
 connector = Connector()
 
-get_systems = sqlalchemy.text(
+get_system_by_system = sqlalchemy.text(
     "SELECT * FROM Systems WHERE system_id = (:id)",
 )
-get_planets = sqlalchemy.text(
+get_planet_by_system = sqlalchemy.text(
+    "SELECT * FROM Planets WHERE system_id = (:id)",
+)
+get_planet_by_planet = sqlalchemy.text(
     "SELECT * FROM Planets WHERE planet_id = (:id)",
 )
-get_resources = sqlalchemy.text(
+get_resource_by_planet = sqlalchemy.text(
+    "SELECT * FROM Resources WHERE planet_id = (:id)",
+)
+get_resource_by_resource = sqlalchemy.text(
     "SELECT * FROM Resources WHERE resource_id = (:id)",
 )
 
@@ -40,21 +46,21 @@ def home():
 def get_system(system_id: int = Path(1, description="ID of planetary system you want", ge=1)):
     pool = createConnPool()
     with pool.connect() as db_conn:
-        result = db_conn.execute(get_systems, id=systemn_id).fetchall()
+        result = db_conn.execute(get_system_by_system, id=systemn_id).fetchall()
         return result
 
 @app.get("/planet-by-id/{planet_id}")
 def get_planet(planet_id: int = Path(1, description="ID of planet you want", ge=1)):
     pool = createConnPool()
     with pool.connect() as db_conn:
-        result = db_conn.execute(get_planets, id=planet_id).fetchall()
+        result = db_conn.execute(get_planet_by_planet, id=planet_id).fetchall()
         return result
 
 @app.get("/resource-by-id/{resource_id}")
 def get_resource(resource_id: int = Path(1, description="ID of resource you want", ge=1)):
     pool = createConnPool()
     with pool.connect() as db_conn:
-        result = db_conn.execute(get_resources, id=resource_id).fetchall()
+        result = db_conn.execute(get_resource_by_resource, id=resource_id).fetchall()
         return result
 
 @app.get("/planet-by-name/{planet_name}")
@@ -68,7 +74,35 @@ def get_planet_name(planet_name: str = Path("Omicron", description="Listed name 
 
 @app.get("/all-galaxy-info")
 def get_galaxy_info():
+    data = {}
     pool = createConnPool()
     with pool.connect() as db_conn:
         systems = db_conn.execute("SELECT * FROM Systems").fetchall()
-        return systems
+        for system in systems:
+            system_id = int(system["system_id"])
+            planets = db_conn.execute(get_planet_by_system, id=system_id).fetchall()
+            for planet in planets:
+                planet_id = int(planet["planet_id"])  
+                resources = db_conn.execute(get_resource_by_planet, id=planet_id).fetchall()
+                return get_resource_info(info_in=resources)
+
+def get_planet_info(info_in: str):
+    planet = {}
+    planet["system_id"] = info_in["system_id"]
+    planet["planet_id"] = info_in["planet_id"]
+    planet["planet_name"] = info_in["planet_name"]
+    planet["planet_type"] = info_in["planet_type"]
+    planet["isStarter"] = info_in["isStarter"]
+    return planet
+
+def get_resource_info(info_in: str):
+    resources = {}
+    i = 0
+    for resource in info_in:
+        d = {}
+        d["resource_id"] = resource["resource_id"]
+        d["resource_name"] = resource["resource_name"]
+        d["resource_quantity"] = resource["resource_quantity"]
+        resources[i] = d
+        i += 1
+    return resources
