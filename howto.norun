@@ -1,1 +1,3 @@
+source env/bin/activate
+
 uvicorn index:app --reload 
