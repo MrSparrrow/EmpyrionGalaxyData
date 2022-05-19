@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Path
 from google.cloud.sql.connector import Connector, IPTypes
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, text
 
 meta = MetaData()
@@ -9,9 +9,6 @@ app = FastAPI()
 connector = Connector()
 
 
-insert_into_system = text(
-    "INSERT INTO System (system_name, system_class) VALUES (:x, :y);"
-)
 get_system_by_system_name = text(
     "SELECT * FROM Systems WHERE system_name = :name;"
 )
@@ -23,6 +20,9 @@ get_planet_by_system = text(
 )
 get_planet_by_planet = text(
     "SELECT * FROM Planets WHERE planet_id = :id;",
+)
+get_planet_by_planet_name = text(
+    "SELECT * FROM Planets WHERE planet_name = :name;",
 )
 get_resource_by_planet = text(
     "SELECT * FROM Resources WHERE planet_id = :id;",
@@ -126,24 +126,71 @@ def get_resource_info(planet_id: int):
 
 
 #DB side
-system = Table(
+systems = Table(
    'Systems', meta, 
    Column('system_id', Integer, primary_key = True), 
    Column('system_name', String), 
    Column('system_class', String),
 )
-#APi side
+planets = Table(
+   'Planets', meta, 
+   Column('planet_id', Integer, primary_key = True), 
+   Column('system_id', Integer), 
+   Column('planet_name', String),
+   Column('planet_type', String),
+   Column('is_starter', bool),
+)
+
+#API side
 class System(BaseModel):
+    system_id: int = Field(default = 0, ge=0)
     system_name: str
     system_class: str
+class Planet(BaseModel):
+    system_id: int = Field(default = 0, ge=0)
+    planet_id: int = Field(default = 0, ge=0)    
+    planet_name: str
+    planet_type: str
+    is_starter: bool
     
 @app.post("/system")
 async def add_system(info: System):
     pool = createConnPool()
     with pool.connect() as db_conn:
-        result = db_conn.execute(system.insert(), 
-            {'system_name': info.system_name, 'system_class': info.system_class}
-        )
-        result = db_conn.execute(get_system_by_system_name, name=info.system_name).fetchall()
-        pool.dispose()
-        return result
+        if info.system_id > 0:
+            idCheck = db_conn.execute(get_system_by_system, id=info.system_id).fetchall()
+            if idCheck:
+                db_conn.execute(systems.update().where(systems.c.system_id==info.system_id).values(system_name=info.system_name, system_class=info.system_class))
+                return db_conn.execute(get_system_by_system, id=info.system_id).fetchall()
+            else:
+                return "System with ID [%s] not found"%info.system_id
+        else:
+            result = db_conn.execute(systems.insert(), 
+                {'system_name': info.system_name, 'system_class': info.system_class}
+            )
+            result = db_conn.execute(get_system_by_system_name, name=info.system_name).fetchall()
+            pool.dispose()
+            return result
+
+@app.post("/planet")
+async def add_planet(info: Planet):
+    pool = createConnPool()
+    with pool.connect() as db_conn:
+        if info.system_id > 0 and info.planet_id == 0:
+            idCheck = db_conn.execute(get_system_by_system, id=info.system_id).fetchall()
+            if idCheck:
+                db_conn.execute(planets.insert(), 
+                    {'system_id': info.system_id, 'planet_name': info.planet_name, 'planet_type':info.planet_type, 'is_starter':info.is_starter}
+                )
+                return db_conn.execute(get_planet_by_planet_name, name=info.planet_name).fetchall()
+            else:
+                return "System with ID [%s] not found"%info.system_id
+        elif info.system_id == 0 and info.planet_id > 0:
+            idCheck = db_conn.execute(get_planet_by_planet, id=info.planet_id).fetchall()
+            if idCheck:
+                db_conn.execute(planets.update().where(planets.c.planet_id==info.planet_id).values(planet_name=info.planet_name, planet_type=info.planet_type, is_starter=info.is_starter))
+                return db_conn.execute(get_planet_by_planet, id=info.planet_id).fetchall()
+            else:
+                return "Planet with ID [%s] not found"%info.planet_id
+        else:
+            return "Must provide ID for either system or planet"
