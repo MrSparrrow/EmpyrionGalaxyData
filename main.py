@@ -1,25 +1,34 @@
 from fastapi import FastAPI, Path
 from google.cloud.sql.connector import Connector, IPTypes
-import sqlalchemy
+from pydantic import BaseModel
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, text
 
+meta = MetaData()
 app = FastAPI()
 
 connector = Connector()
 
-get_system_by_system = sqlalchemy.text(
-    "SELECT * FROM Systems WHERE system_id = (:id)",
+
+insert_into_system = text(
+    "INSERT INTO System (system_name, system_class) VALUES (:x, :y);"
 )
-get_planet_by_system = sqlalchemy.text(
-    "SELECT * FROM Planets WHERE system_id = (:id)",
+get_system_by_system_name = text(
+    "SELECT * FROM Systems WHERE system_name = :name;"
 )
-get_planet_by_planet = sqlalchemy.text(
-    "SELECT * FROM Planets WHERE planet_id = (:id)",
+get_system_by_system = text(
+    "SELECT * FROM Systems WHERE system_id = :id;",
 )
-get_resource_by_planet = sqlalchemy.text(
-    "SELECT * FROM Resources WHERE planet_id = (:id)",
+get_planet_by_system = text(
+    "SELECT * FROM Planets WHERE system_id = :id;",
 )
-get_resource_by_resource = sqlalchemy.text(
-    "SELECT * FROM Resources WHERE resource_id = (:id)",
+get_planet_by_planet = text(
+    "SELECT * FROM Planets WHERE planet_id = :id;",
+)
+get_resource_by_planet = text(
+    "SELECT * FROM Resources WHERE planet_id = :id;",
+)
+get_resource_by_resource = text(
+    "SELECT * FROM Resources WHERE resource_id = :id;",
 )
 
 # function to return the database connection
@@ -33,20 +42,18 @@ def getconn():
     )
     return conn
 def createConnPool():
-    return sqlalchemy.create_engine("mysql+pymysql://",creator=getconn,)
+    return create_engine("mysql+pymysql://",creator=getconn,)
 
 @app.get("/")
 def home():
-    pool = createConnPool()
-    with pool.connect() as db_conn:
-        result = db_conn.execute("SELECT * FROM SimpleGalaxyInfo").fetchall()
-        return {"Message": "Yeah PD, your app is running", "Data": result}
+    return {"Message": "Yeah PD, your app is running", "Data": get_galaxy_info()}
 
 @app.get("/system-by-id/{system_id}")
 def get_system(system_id: int = Path(1, description="ID of planetary system you want", ge=1)):
     pool = createConnPool()
     with pool.connect() as db_conn:
-        result = db_conn.execute(get_system_by_system, id=systemn_id).fetchall()
+        result = db_conn.execute(get_system_by_system, id=system_id).fetchall()
+        pool.dispose()
         return result
 
 @app.get("/planet-by-id/{planet_id}")
@@ -54,6 +61,7 @@ def get_planet(planet_id: int = Path(1, description="ID of planet you want", ge=
     pool = createConnPool()
     with pool.connect() as db_conn:
         result = db_conn.execute(get_planet_by_planet, id=planet_id).fetchall()
+        pool.dispose()
         return result
 
 @app.get("/resource-by-id/{resource_id}")
@@ -61,16 +69,8 @@ def get_resource(resource_id: int = Path(1, description="ID of resource you want
     pool = createConnPool()
     with pool.connect() as db_conn:
         result = db_conn.execute(get_resource_by_resource, id=resource_id).fetchall()
+        pool.dispose()
         return result
-
-@app.get("/planet-by-name/{planet_name}")
-def get_planet_name(planet_name: str = Path("Omicron", description="Listed name of planet")):
-	for sector_id in galaxy:
-		sector = galaxy[sector_id]
-		for planet_id in sector.get("planets"):
-			planet = sector.get("planets")[planet_id]
-			if planet.get("name").lower() == planet_name.lower():
-				return planet
 
 @app.get("/all-galaxy-info")
 def get_galaxy_info():
@@ -108,7 +108,7 @@ def get_planet_info(system_id: str):
             i += 1
         return planets
 
-def get_resource_info(planet_id: int):
+def get_resource_info(planet_id: int):    
     pool = createConnPool()
     with pool.connect() as db_conn:
         resources = {}
@@ -123,3 +123,27 @@ def get_resource_info(planet_id: int):
             resources[i] = d
             i += 1
         return resources
+
+
+#DB side
+system = Table(
+   'Systems', meta, 
+   Column('system_id', Integer, primary_key = True), 
+   Column('system_name', String), 
+   Column('system_class', String),
+)
+#APi side
+class System(BaseModel):
+    system_name: str
+    system_class: str
+    
+@app.post("/system")
+async def add_system(info: System):
+    pool = createConnPool()
+    with pool.connect() as db_conn:
+        result = db_conn.execute(system.insert(), 
+            {'system_name': info.system_name, 'system_class': info.system_class}
+        )
+        result = db_conn.execute(get_system_by_system_name, name=info.system_name).fetchall()
+        pool.dispose()
+        return result
