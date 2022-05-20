@@ -8,7 +8,6 @@ app = FastAPI()
 
 connector = Connector()
 
-
 get_system_by_system_name = text(
     "SELECT * FROM Systems WHERE system_name = :name;"
 )
@@ -138,7 +137,7 @@ planets = Table(
    Column('system_id', Integer), 
    Column('planet_name', String),
    Column('planet_type', String),
-   Column('is_starter', bool),
+   Column('is_starter', String),
 )
 
 #API side
@@ -151,7 +150,7 @@ class Planet(BaseModel):
     planet_id: int = Field(default = 0, ge=0)    
     planet_name: str
     planet_type: str
-    is_starter: bool
+    is_starter: str
     
 @app.post("/system")
 async def add_system(info: System):
